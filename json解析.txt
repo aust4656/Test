@@ -1,0 +1,163 @@
+package com.example.app3;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.DatePickerDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.BaseAdapter;
+import android.widget.DatePicker;
+import android.widget.GridView;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import com.google.gson.Gson;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
+
+    GridView gridView;
+    TextView textView;
+    String jsontext = null;
+    BaseAdapter baseAdapter = null;
+    String imurl = "http://api.juheapi.com/japi/toh?key=3238a57d0c7a1c8d60dfe639f8879552&v=1.0&month=11&day=22";
+    URL urlImage = null;
+    Bitmap bitmap = null;
+    List<String> title = new ArrayList<>();
+    List<String> des = new ArrayList<>();
+    List<String> pic = new ArrayList<>();
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        gridView = findViewById(R.id.gridView);
+        textView = findViewById(R.id.textView);
+
+        MyAsyncTask myAsyncTask = new MyAsyncTask();
+        myAsyncTask.execute();
+        baseAdapter = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return title.size();
+            }
+
+            @Override
+            public Object getItem(int position) {
+                return null;
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return 0;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                if (convertView == null)
+                    convertView = LayoutInflater.from(MainActivity.this).inflate(R.layout.activity_view,null);
+                TextView title1 = convertView.findViewById(R.id.title1);
+                title1.setText(title.get(position));
+                TextView title2 = convertView.findViewById(R.id.title2);
+                title2.setText(des.get(position));
+                ImageView imageView = convertView.findViewById(R.id.imageView);
+                try {
+                    urlImage = new URL(pic.get(position));
+                    ImageAsyncTask imageAsyncTask = new ImageAsyncTask();
+                    imageAsyncTask.execute();
+                    imageView.setImageBitmap(bitmap);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return convertView;
+            }
+        };
+        gridView.setAdapter(baseAdapter);
+    }
+
+    class MyAsyncTask extends AsyncTask{
+
+        @Override
+        protected Object doInBackground(Object[] objects) {
+            try {
+                StringBuffer stringBuffer = new StringBuffer();
+                URL url = new URL(imurl);
+                HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
+                if(httpURLConnection.getResponseCode()==200){
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()));
+                    String line = null;
+                    while ((line = bufferedReader.readLine())!= null){
+                        stringBuffer.append(line);
+                    }
+                    jsontext = stringBuffer.toString();
+                    bufferedReader.close();
+                }
+                httpURLConnection.disconnect();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                JSONObject jsonObject = new JSONObject(jsontext);
+                JSONArray jsonArray = jsonObject.getJSONArray("result");
+                for(int i =0 ; i<jsonArray.length() ; i++){
+                    JSONObject jsonnews = jsonArray.getJSONObject(i);
+                    title.add(jsonnews.getString("title"));
+                    des.add(jsonnews.getString("des"));
+                    pic.add(jsonnews.getString("pic"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+    class ImageAsyncTask extends AsyncTask{
+
+        @Override
+        protected Object doInBackground(Object[] objects) {
+            try {
+                HttpURLConnection httpURLConnection = (HttpURLConnection) urlImage.openConnection();
+                if (httpURLConnection.getResponseCode()==200){
+                    InputStream inputStream = httpURLConnection.getInputStream();
+                    bitmap = BitmapFactory.decodeStream(inputStream);
+                    inputStream.close();
+                }
+                httpURLConnection.disconnect();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+    public void click(View view) {
+        Calendar calendar = Calendar.getInstance();
+        DatePickerDialog datePickerDialog = new DatePickerDialog(MainActivity.this, new DatePickerDialog.OnDateSetListener() {
+            @Override
+            public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
+                imurl = "http://api.juheapi.com/japi/toh?key=3238a57d0c7a1c8d60dfe639f8879552&v=1.0&month="+(month+1)+"&day="+dayOfMonth;
+                textView.setText("历史上的今天："+year+"-"+(month+1)+"-"+dayOfMonth);
+            }
+        },calendar.get(Calendar.YEAR),calendar.get(Calendar.MONTH),calendar.get(Calendar.DAY_OF_MONTH));
+        datePickerDialog.show();
+    }
+}
